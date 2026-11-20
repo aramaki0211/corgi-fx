@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CORGI FX">
+<meta name="theme-color" content="#0f1115">
+<meta name="robots" content="noindex, nofollow">
+<title>CORGI FX</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#262b35; --text:#e8eaed; --sub:#9aa3b2;
+    --long:#22c1a3; --short:#ef5350; --warn:#f5a623; --block:#ff8c42; --info:#4c8dff; /* ドル買い=青緑 / ドル売り=赤 / 禁止=オレンジ */
+    --e20:#f5c542; --e80:#4c8dff; --e200:#c678dd;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;line-height:1.45}
+  body{padding:env(safe-area-inset-top) 0 calc(64px + env(safe-area-inset-bottom)) 0}
+  header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
+  header h1{font-size:17px;margin:0;letter-spacing:.5px}
+  header .meta{font-size:12px;color:var(--sub);text-align:right}
+  button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+  button.primary{background:var(--info);border-color:var(--info);color:#fff}
+  .iconbtn{padding:6px 10px;font-size:16px}
+  main{padding:12px 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+  .card h2{font-size:14px;margin:0 0 8px;color:var(--sub);font-weight:600}
+  .banner{border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:700}
+  .banner small{display:block;font-weight:400;font-size:13px;margin-top:4px;opacity:.9}
+  .b-block{background:rgba(255,140,66,.16);border:1px solid var(--block);color:#ffb27d}
+  .b-ok{background:rgba(255,255,255,.04);border:1px solid #3a4150;color:var(--text)}
+  .b-idle{background:rgba(154,163,178,.1);border:1px solid var(--line);color:var(--sub)}
+  .b-demo{background:rgba(245,166,35,.15);border:1px solid var(--warn);color:var(--warn);font-size:13px}
+  .verdict{font-size:20px;font-weight:800;margin:2px 0 4px}
+  .sides{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px}
+  .side.hot.long{border-color:var(--long);box-shadow:0 0 0 1px var(--long) inset}
+  .side.hot.short{border-color:var(--short);box-shadow:0 0 0 1px var(--short) inset}
+  .side h3{margin:0 0 6px;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+  .score{font-size:13px;padding:2px 8px;border-radius:99px;background:var(--line)}
+  .cond{display:flex;gap:6px;align-items:flex-start;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}
+  .cond:first-of-type{border-top:none}
+  .cond .mk{width:18px;flex:none;text-align:center}
+  .cond .d{color:var(--sub);font-size:12px}
+  .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:4px 0 8px}
+  .bar>i{display:block;height:100%}
+  canvas{width:100%;display:block;border-radius:10px;background:#12151b}
+  .legend{display:flex;gap:12px;font-size:12px;color:var(--sub);margin-top:6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:4px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+  .kv span:nth-child(odd){color:var(--sub)}
+  .ev{display:grid;grid-template-columns:48px 34px 1fr;gap:8px;align-items:start;padding:9px 0;border-top:1px solid var(--line)}
+  .ev:first-of-type{border-top:none}
+  .ev .t{font-variant-numeric:tabular-nums;font-weight:700}
+  .ev .w{font-size:12px;color:var(--sub)}
+  .ev.past{opacity:.45}
+  .ev.now{background:rgba(255,140,66,.14);border-radius:8px;padding-left:6px;padding-right:6px}
+  .rk{font-size:12px;font-weight:800;border-radius:6px;text-align:center;padding:1px 0}
+  .rk-S{background:#7e57c2;color:#fff}
+  .rk-A{background:var(--warn);color:#111}
+  .rk-B{background:var(--line);color:var(--sub)}
+  .rk-X{background:#4a5568;color:#fff}
+  .flag{font-size:11px;color:var(--sub);margin-left:4px}
+  .news{display:block;padding:10px 0;border-top:1px solid var(--line);color:var(--text);text-decoration:none}
+  .news:first-of-type{border-top:none}
+  .news .h{font-weight:600}
+  .news .m{font-size:12px;color:var(--sub);margin-top:2px}
+  .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:5px;background:var(--line);color:var(--sub);margin-right:4px}
+  .err{color:#ffb27d;font-size:13px}
+  .buy{color:var(--long);font-weight:700}.sell{color:var(--short);font-weight:700}.flat{color:var(--sub)}
+  .res{font-size:12px;margin-top:3px}
+  .src{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line);color:var(--text);text-decoration:none}
+  .src:first-of-type{border-top:none}
+  .muted{color:var(--sub);font-size:13px}
+  nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);
+    background:#13161c;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  nav button{border:none;border-radius:0;background:none;padding:10px 0 12px;color:var(--sub);font-size:13px}
+  nav button b{display:block;font-size:18px;line-height:1.2}
+  nav button.on{color:var(--text)}
+  nav .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--block);margin-left:3px;vertical-align:top}
+  .tab{display:none}.tab.on{display:block}
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:16px;width:min(560px,94vw);padding:16px}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+  input,select{width:100%;font:inherit;color:var(--text);background:#0f1115;border:1px solid var(--line);border-radius:10px;padding:9px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .toggle{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--sub);margin:8px 0}
+  .toggle input{width:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>CORGI FX <span class="muted">USD/JPY 15分足</span></h1>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="meta" id="hdrMeta">未取得</div>
+    <button class="iconbtn" id="btnRefresh" aria-label="更新">↻</button>
+    <button class="iconbtn" id="btnSettings" aria-label="設定">⚙︎</button>
+  </div>
+</header>
+
+<main>
+  <div id="demoBanner" class="banner b-demo" hidden>デモモード：架空のデータで表示しています。実際の相場ではありません。</div>
+
+  <!-- ===== チャート ===== -->
+  <section class="tab on" id="tab-chart">
+    <div id="gate" class="banner b-idle">取得待ち</div>
+    <div class="card" id="verdictCard">
+      <h2>判定</h2>
+      <div class="verdict" id="verdict">—</div>
+      <div class="muted" id="verdictSub"></div>
+    </div>
+    <div class="sides">
+      <div class="side long" id="sideLong"></div>
+      <div class="side short" id="sideShort"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h2>チャート（直近64本）</h2>
+      <canvas id="cv" height="300"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--e20)"></i>20EMA</span>
+        <span><i style="background:var(--e80)"></i>80EMA</span>
+        <span><i style="background:var(--e200)"></i>200EMA</span>
+        <span><i style="background:#fff;opacity:.6"></i>トリガー</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>数値</h2>
+      <div class="kv" id="nums"></div>
+    </div>
+  </section>
+
+  <!-- ===== 経済指標 ===== -->
+  <section class="tab" id="tab-cal">
+    <div id="calGate" class="banner b-idle">—</div>
+    <div class="card">
+      <h2>ルール</h2>
+      <div class="muted">
+        <b style="color:#b39ddb">S級</b> 前60分〜後30分 新規禁止（保有は発表前に手仕舞い）<br>
+        <b style="color:var(--warn)">A級</b> 前30分〜後15分 新規禁止<br>
+        <b style="color:#a0aec0">仲値</b> 5・10日（ごとうび）9:45〜10:00 新規禁止<br>
+        B は参考表示のみ。時刻はすべて日本時間。
+      </div>
+    </div>
+    <div id="calList"></div>
+    <div class="muted" id="calSrc"></div>
+  </section>
+
+  <!-- ===== ニュース ===== -->
+  <section class="tab" id="tab-news">
+    <div class="card">
+      <h2>リンク（タップでSafariで開く）</h2>
+      <a class="src" href="https://kissfx.com/" target="_blank" rel="noopener"><span>羊飼いのFXブログ　今日の注目材料・相場観</span><span>↗</span></a>
+      <a class="src" href="https://www.gaitame.com/markets/news/" target="_blank" rel="noopener"><span>外為どっとコム　外為情報ナビ ニュース</span><span>↗</span></a>
+      <a class="src" href="https://min-fx.jp/market/news/" target="_blank" rel="noopener"><span>みんなのFX　為替ニュース</span><span>↗</span></a>
+      <div class="muted" style="margin-top:6px">これらのサイトは配信用データ（RSS）がないため、アプリ内には取り込めません。</div>
+    </div>
+    <div class="card">
+      <h2>ドル円関連ニュース（過去24時間）</h2>
+      <div id="newsList"><div class="muted">未取得</div></div>
+    </div>
+    <div class="muted" id="newsSrc"></div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-tab="chart"><b>📈</b>チャート</button>
+  <button data-tab="cal"><b>🗓</b>経済指標<span class="dot" id="calDot" hidden></span></button>
+  <button data-tab="news"><b>📰</b>ニュース</button>
+</nav>
+
+<dialog id="dlg">
+  <h3 style="margin:0 0 4px">設定</h3>
+  <div class="muted">キーはこの端末のブラウザにだけ保存されます。</div>
+  <label>Twelve Data APIキー（価格）</label>
+  <input id="kTd" autocomplete="off" placeholder="twelvedata.com で無料取得">
+  <div class="toggle"><input type="checkbox" id="demo"><span>デモモード（架空データ）</span></div>
+  <div class="muted" id="usage"></div>
+
+  <h3 style="margin:16px 0 4px">指標を手動で追加</h3>
+  <div class="muted">自動取得できない時の予備です。</div>
+  <label>日時（日本時間）</label>
+  <input type="datetime-local" id="mDt">
+  <label>指標名</label>
+  <input id="mName" placeholder="例：米雇用統計">
+  <label>ランク</label>
+  <select id="mRank"><option value="S">S級</option><option value="A">A級</option><option value="B">B（参考）</option></select>
+  <div class="row"><button id="mAdd">追加</button></div>
+  <div id="mList" style="margin-top:8px"></div>
+
+  <div class="row" style="justify-content:flex-end">
+    <button id="dlgClose">閉じる</button>
+    <button class="primary" id="dlgSave">保存して更新</button>
+  </div>
+</dialog>
+
+<script>
+/*CORE_START*/
+const Core = (() => {
+  const PIP = 0.01;
+  const H = 3600e3, M = 60e3;
+
+  // ---- 時刻（JST） ----
+  const jst = ms => new Date(ms + 9 * H);             // getUTC* で日本時間の値を読む
+  const pad = n => String(n).padStart(2, '0');
+  const fmtHM = ms => { const d = jst(ms); return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); };
+  const ymd = ms => { const d = jst(ms); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); };
+  const parseJst = s => { // "2026-11-20 11:45:00" を日本時間として解釈
+    const [a, b = '00:00:00'] = s.trim().split(/[ T]/);
+    const [y, mo, d] = a.split('-').map(Number), [h, mi, se = 0] = b.split(':').map(Number);
+    return Date.UTC(y, mo - 1, d, h, mi, se) - 9 * H;
+  };
+  const jstMidnight = ms => { const d = jst(ms); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 9 * H; };
+  const dow = ms => jst(ms).getUTCDay();
+  const prevBizDay = ms => { let t = jstMidnight(ms) - 24 * H; while ([0, 6].includes(dow(t))) t -= 24 * H; return t; };
+
+  // ---- インジケーター ----
+  function ema(v, p) {
+    const out = new Array(v.length).fill(null), k = 2 / (p + 1);
+    if (v.length < p) return out;
+    let s = 0; for (let i = 0; i < p; i++) s += v[i];
+    out[p - 1] = s / p;
+    for (let i = p; i < v.length; i++) out[i] = v[i] * k + out[i - 1] * (1 - k);
+    return out;
+  }
+  function atr(b, p = 14) {
+    const tr = b.map((x, i) => i === 0 ? x.h - x.l :
+      Math.max(x.h - x.l, Math.abs(x.h - b[i - 1].c), Math.abs(x.l - b[i - 1].c)));
+    const out = new Array(b.length).fill(null);
+    if (b.length <= p) return out;
+    let s = 0; for (let i = 1; i <= p; i++) s += tr[i];
+    out[p] = s / p;
+    for (let i = p + 1; i < b.length; i++) out[i] = (out[i - 1] * (p - 1) + tr[i]) / p;
+    return out;
+  }
+  function rsi(v, p = 14) {
+    const out = new Array(v.length).fill(null);
+    if (v.length <= p) return out;
+    let g = 0, l = 0;
+    for (let i = 1; i <= p; i++) { const d = v[i] - v[i - 1]; d > 0 ? g += d : l -= d; }
+    g /= p; l /= p; out[p] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    for (let i = p + 1; i < v.length; i++) {
+      const d = v[i] - v[i - 1];
+      g = (g * (p - 1) + Math.max(d, 0)) / p; l = (l * (p - 1) + Math.max(-d, 0)) / p;
+      out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    }
+    return out;
+  }
+  function indicators(bars) {
+    const c = bars.map(b => b.c);
+    return { e20: ema(c, 20), e80: ema(c, 80), e200: ema(c, 200), atr: atr(bars, 14), rsi: rsi(c, 14) };
+  }
+
+  // ---- エントリー4要件 ----
+  // bars: 古い順。forming=true の足は未確定（最後の1本のみ）。live: 最新価格
+  function evaluate(bars, ind, live) {
+    const closedN = bars.filter(b => !b.forming).length;
+    const i = closedN - 1;
+    if (i < 230 || ind.e200[i] == null) return { error: 'データ不足（確定足が230本以上必要）' };
+    const side = dir => evalSide(dir, bars, ind, i, live);
+    return { i, long: side(1), short: side(-1) };
+  }
+
+  function evalSide(dir, b, ind, i, live) {
+    const { e20, e80, e200, atr: A } = ind;
+    const L = dir === 1;
+    const f2 = x => x.toFixed(3);
+
+    // ① 環境（判定は最新の確定足で行う）
+    const env = k => {
+      const order = L ? (b[k].c > e20[k] && e20[k] > e200[k]) : (b[k].c < e20[k] && e20[k] < e200[k]);
+      const s200 = (e200[k] - e200[k - 20]) * dir, s80 = (e80[k] - e80[k - 20]) * dir;
+      return { ok: order && s200 >= 0.3 * A[k] && s80 > 0, order, s200, s80 };
+    };
+    // ② 押し・戻り（直近3本のどれかの安値/高値が 20EMA±0.5ATR）＋ 乖離2ATR以内
+    const pull = k => {
+      let touched = false;
+      for (let j = k - 2; j <= k; j++) {
+        const x = L ? b[j].l : b[j].h;
+        if (Math.abs(x - e20[j]) <= 0.5 * A[j]) touched = true;
+      }
+      const ext = Math.abs(b[k].c - e20[k]) <= 2 * A[k];
+      return { ok: touched && ext, touched, ext };
+    };
+    // ③ 反発足
+    const sig = k => L ? (b[k].c > b[k].o && b[k].c > e20[k]) : (b[k].c < b[k].o && b[k].c < e20[k]);
+    const trig = k => L ? b[k].h + 2 * PIP : b[k].l - 2 * PIP;
+    const hit = (price, t) => L ? price >= t : price <= t;
+
+    // 有効な反発足を探す：直近確定足 i、なければ i-1（その後2本以内の有効期限）
+    let s = null, triggeredBefore = false;
+    for (const k of [i, i - 1]) {
+      if (sig(k) && pull(k).ok && env(k).ok) {
+        // k の後に確定した足ですでにトリガーを越えていたら、その反発足は使用済み
+        let used = false;
+        for (let j = k + 1; j <= i; j++) if (hit(L ? b[j].h : b[j].l, trig(k))) used = true;
+        if (used) { triggeredBefore = true; continue; }
+        s = k; break;
+      }
+    }
+
+    const k0 = s ?? i;
+    const e = env(i), p = pull(s ?? i);
+    const c1 = { name: '① 環境', ok: e.ok,
+      d: `並び${e.order ? '○' : '×'} / 200EMA傾き ${(e.s200 / A[i]).toFixed(2)}ATR（0.3以上）/ 80EMA ${e.s80 > 0 ? (L ? '上向き' : '下向き') : '逆向き・横ばい'}` };
+    const c2 = { name: L ? '② 押し' : '② 戻り', ok: p.ok,
+      d: `${L ? '安値' : '高値'}が20EMA±0.5ATR ${p.touched ? '到達' : '未到達'} / 乖離 ${(Math.abs(b[k0].c - e20[k0]) / A[k0]).toFixed(2)}ATR（2以下）` };
+    const c3 = { name: '③ 反発足', ok: s !== null,
+      d: s !== null ? `${s === i ? '直近足' : '1本前'}が${L ? '陽線・20EMA上で確定' : '陰線・20EMA下で確定'}`
+        : triggeredBefore ? '直近の反発足はすでにトリガー済み' : `${L ? '20EMA上の陽線' : '20EMA下の陰線'}の確定待ち` };
+    let c4;
+    if (s !== null) {
+      const t = trig(s);
+      c4 = { name: '④ ブレイク', ok: hit(live, t), trigger: t,
+        d: `${L ? '高値+2pips' : '安値-2pips'} ${f2(t)} ${hit(live, t) ? 'を' + (L ? '上抜け' : '下抜け') : 'まで ' + (Math.abs(t - live) / PIP).toFixed(1) + 'pips'}（期限：反発足の後2本）` };
+    } else c4 = { name: '④ ブレイク', ok: false, d: '反発足が出てから判定' };
+
+    const conds = [c1, c2, c3, c4];
+    const score = conds.filter(c => c.ok).length;
+    let status = 'none';
+    if (c1.ok && c2.ok && c3.ok && c4.ok) status = 'go';
+    else if (c1.ok && c2.ok && c3.ok) status = 'wait';
+    else if (c1.ok) status = 'watch';
+    return { dir, conds, score, status, trigger: c4.trigger ?? null };
+  }
+
+  // ---- 経済指標のランク分け ----
+  function rankEvent(ev) {
+    const t = ev.title || '', c = ev.country;
+    if (!['USD', 'JPY'].includes(c)) return null;
+    if (c === 'USD' && /FOMC|Federal Funds Rate|Non-Farm Employment Change/i.test(t)) return 'S';
+    if (c === 'USD' && /^(Core )?CPI/i.test(t)) return 'S';
+    if (c === 'JPY' && /BOJ Policy Rate|Monetary Policy Statement|BOJ Press Conference|BOJ Outlook Report/i.test(t)) return 'S';
+    if (/CPI|GDP|Retail Sales|ISM|PMI|Unemployment|Employment|Claims|ADP|JOLTS|Average Hourly|Payrolls/i.test(t)) return 'A';
+    if (/high/i.test(ev.impact || '')) return 'A';
+    if (/medium/i.test(ev.impact || '')) return 'B';
+    return null;
+  }
+  const WIN = { S: [60, 30], A: [30, 15] };
+  const windowOf = ev => WIN[ev.rank] ? [ev.t - WIN[ev.rank][0] * M, ev.t + WIN[ev.rank][1] * M] : null;
+
+  // ---- 過去の指標：ドル買い/ドル売り ----
+  // 予想比：その国の通貨に強い結果か（失業系は逆）。USD/JPY の方向に直す（日本の好結果＝円買い＝ドル円売り）
+  const INVERSE = /Unemployment Rate|Unemployment Claims|Jobless|Claimant|Continuing Claims/i;
+  const num = s => { if (s == null || s === '') return null; const m = String(s).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? +m[0] : null; };
+  function surprise(ev) {
+    const a = num(ev.actual), f = num(ev.forecast);
+    if (a == null || f == null) return null;
+    if (a === f) return { dir: 0, label: '予想通り' };
+    let strong = a > f; if (INVERSE.test(ev.name || '')) strong = !strong;
+    const dir = ev.country === 'USD' ? (strong ? 1 : -1) : ev.country === 'JPY' ? (strong ? -1 : 1) : 0;
+    return { dir, label: a > f ? '予想より上振れ' : '予想より下振れ' };
+  }
+  // 実際の値動き：発表時刻を含む15分足の始値→終値（5pips未満は方向感なし）
+  function reaction(bars, t) {
+    const b = bars.find(x => x.t <= t && t < x.t + 15 * M);
+    if (!b || b.forming) return null;
+    const pips = (b.c - b.o) / PIP;
+    return { pips, dir: Math.abs(pips) < 5 ? 0 : (pips > 0 ? 1 : -1) };
+  }
+
+  // ---- ごとうび（5・10日、月末。土日なら前の金曜。日本の祝日は未対応） ----
+  function isGotobi(ms) {
+    const d0 = jstMidnight(ms), w = dow(d0);
+    if (w === 0 || w === 6) return false;
+    const days = [d0];
+    if (w === 5) days.push(d0 + 24 * H, d0 + 48 * H);
+    return days.some(t => {
+      const d = jst(t), day = d.getUTCDate();
+      const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+      return (day % 5 === 0 && day <= 25) || day === last;
+    });
+  }
+
+  // ---- 今エントリーしてよいか ----
+  function gate(now, events) {
+    const reasons = [];
+    const d = jst(now), w = d.getUTCDay(), mins = d.getUTCHours() * 60 + d.getUTCMinutes();
+    if (w === 0 || (w === 6 && mins >= 7 * 60) || (w === 1 && mins < 7 * 60))
+      return { ok: false, closed: true, reasons: [{ label: '市場休止中（週末）' }], next: [] };
+    if (mins >= 30 && mins < 8 * 60)
+      reasons.push({ label: mins < 60 ? '0:30以降は新規エントリーなし（1:00までに手仕舞い）' : '監視時間外（8:00から）' });
+    if (isGotobi(now) && mins >= 9 * 60 + 45 && mins < 10 * 60)
+      reasons.push({ label: '仲値（ごとうび）9:45〜10:00', until: jstMidnight(now) + 10 * H });
+    const next = [];
+    for (const ev of events) {
+      const win = windowOf(ev); if (!win) continue;
+      if (now >= win[0] && now < win[1]) reasons.push({ label: `${ev.rank}級 ${ev.name}（${fmtHM(ev.t)}）`, until: win[1], ev });
+      else if (win[0] > now && win[0] - now <= 3 * H) next.push({ ev, from: win[0], to: win[1] });
+    }
+    next.sort((a, b) => a.from - b.from);
+    return { ok: reasons.length === 0, reasons, next };
+  }
+
+  return { PIP, H, M, jst, fmtHM, ymd, parseJst, jstMidnight, prevBizDay, dow, ema, atr, rsi, indicators,
+    evaluate, rankEvent, windowOf, isGotobi, gate, surprise, reaction };
+})();
+/*CORE_END*/
+
+// ================= アプリ =================
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('cfx.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('cfx.' + k, JSON.stringify(v)); } catch {} }
+};
+const cfg = { td: store.get('td', ''), demo: store.get('demo', false), manual: store.get('manual', []) };
+const st = { bars: [], ind: null, ev: null, live: null, events: [], calStatus: '未取得', calAt: 0,
+  news: [], newsStatus: '未取得', priceErr: '', priceAt: 0 };
+
+// ---------- 価格 ----------
+function countCredit() {
+  const day = Core.ymd(Date.now()); const u = store.get('usage', { day, n: 0 });
+  if (u.day !== day) { u.day = day; u.n = 0; } u.n++; store.set('usage', u); return u.n;
+}
+async function loadPrice() {
+  if (cfg.demo) { st.bars = demoBars(); st.priceErr = ''; st.priceAt = Date.now(); return; }
+  if (!cfg.td) { st.priceErr = '設定でTwelve DataのAPIキーを入力してください'; return; }
+  try {
+    const url = 'https://api.twelvedata.com/time_series?symbol=USD/JPY&interval=15min&outputsize=600&timezone=Asia/Tokyo&apikey=' + encodeURIComponent(cfg.td);
+    const r = await fetch(url); const j = await r.json(); countCredit();
+    if (j.status !== 'ok' || !Array.isArray(j.values)) throw new Error(j.message || '取得失敗');
+    const now = Date.now();
+    const bars = j.values.slice().reverse().map(v => ({ t: Core.parseJst(v.datetime), o: +v.open, h: +v.high, l: +v.low, c: +v.close }));
+    bars.forEach((b, k) => b.forming = (k === bars.length - 1 && now < b.t + 15 * Core.M));
+    st.bars = bars; st.priceErr = ''; st.priceAt = now;
+  } catch (e) { st.priceErr = '価格を取得できませんでした：' + e.message; }
+}
+function demoBars() {
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const bars = []; let p = 154.0; const t0 = Math.floor(Date.now() / (15 * Core.M)) * 15 * Core.M - 599 * 15 * Core.M;
+  for (let k = 0; k < 600; k++) {
+    const drift = k < 560 ? 0.004 : (k < 590 ? -0.012 : 0.01);
+    const o = p, c = o + drift + (rnd() - 0.5) * 0.09;
+    bars.push({ t: t0 + k * 15 * Core.M, o, c, h: Math.max(o, c) + rnd() * 0.04, l: Math.min(o, c) - rnd() * 0.04 });
+    p = c;
+  }
+  bars[bars.length - 1].forming = true;
+  return bars;
+}
+
+// ---------- 経済指標 ----------
+async function loadCalendar(force) {
+  const cache = store.get('cal', null);
+  if (!force && cache && Date.now() - cache.at < 3 * Core.H) { applyCal(cache.raw, cache.at, '保存済みデータ'); return; }
+  try {
+    const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const raw = await r.json(); const at = Date.now();
+    store.set('cal', { raw, at }); applyCal(raw, at, '取得');
+  } catch (e) {
+    if (cache) applyCal(cache.raw, cache.at, '取得失敗のため前回データ');
+    else { st.events = manualEvents(); st.calStatus = '自動取得できませんでした（' + e.message + '）。手動追加分のみ表示中'; }
+  }
+}
+function applyCal(raw, at, how) {
+  const evs = [];
+  for (const x of raw) {
+    const rank = Core.rankEvent(x); if (!rank) continue;
+    const t = Date.parse(x.date); if (isNaN(t)) continue;
+    evs.push({ t, rank, name: x.title, country: x.country, forecast: x.forecast, previous: x.previous, actual: x.actual, src: 'auto' });
+  }
+  st.events = evs.concat(manualEvents()).sort((a, b) => a.t - b.t);
+  st.calAt = at; st.calStatus = how;
+}
+function manualEvents() { return cfg.manual.map(m => ({ t: m.t, rank: m.rank, name: m.name, country: '', src: 'manual' })); }
+
+// ---------- ニュース ----------
+// Googleニュースの日本語検索フィードを、RSS→JSON変換サービス（rss2json）経由で取得
+const NEWS_QUERY = '(ドル円 OR 円相場 OR 為替 OR 日銀 OR FRB OR 円安 OR 円高) when:1d';
+const NEWS_RSS = 'https://news.google.com/rss/search?q=' + encodeURIComponent(NEWS_QUERY) + '&hl=ja&gl=JP&ceid=JP:ja';
+async function loadNews(force) {
+  const cache = store.get('newsJa', null);
+  if (!force && cache && Date.now() - cache.at < 10 * Core.M) { st.news = cache.items; st.newsStatus = '保存済み（' + Core.fmtHM(cache.at) + '取得）'; return; }
+  try {
+    const r = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(NEWS_RSS));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (j.status !== 'ok' || !Array.isArray(j.items)) throw new Error(j.message || '変換サービスのエラー');
+    const items = j.items.map(n => {
+      const m = String(n.title).match(/^(.*) - ([^-]+)$/);           // 「見出し - 媒体名」を分ける
+      const t = Date.parse(String(n.pubDate).replace(' ', 'T') + 'Z'); // rss2json は UTC
+      return { t, h: m ? m[1] : n.title, s: m ? m[2].trim() : (n.author || ''), u: n.link };
+    }).filter(n => !isNaN(n.t)).sort((a, b) => b.t - a.t);
+    store.set('newsJa', { items, at: Date.now() });
+    st.news = items; st.newsStatus = Core.fmtHM(Date.now()) + ' 取得';
+  } catch (e) {
+    if (cache) { st.news = cache.items; st.newsStatus = '取得失敗のため ' + Core.fmtHM(cache.at) + ' のデータ（' + e.message + '）'; }
+    else st.newsStatus = 'ニュースを取得できませんでした：' + e.message;
+  }
+}
+
+// ---------- 描画 ----------
+function renderChart() {
+  const now = Date.now();
+  const g = Core.gate(now, st.events);
+  const gateEl = $('gate');
+  if (!g.ok) {
+    gateEl.className = 'banner b-block';
+    gateEl.innerHTML = '⛔ 新規エントリー禁止' + g.reasons.map(r => `<small>${r.label}${r.until ? '　→ ' + Core.fmtHM(r.until) + ' まで' : ''}</small>`).join('');
+  } else if (g.next.length) {
+    const n = g.next[0]; const mins = Math.round((n.from - now) / Core.M);
+    gateEl.className = 'banner b-ok';
+    gateEl.innerHTML = `✅ エントリー可<small>⚠️ あと${mins}分で禁止：${n.ev.rank}級 ${n.ev.name}（${Core.fmtHM(n.from)}〜${Core.fmtHM(n.to)}）</small>`;
+  } else {
+    if (!st.calAt) { gateEl.className = 'banner b-demo'; gateEl.innerHTML = '⚠️ 指標データ未取得<small>時間帯ルールはOK。指標の禁止時間帯は外部カレンダーで確認してください</small>'; }
+    else { gateEl.className = 'banner b-ok'; gateEl.innerHTML = '✅ エントリー可<small>3時間以内に禁止時間帯はありません</small>'; }
+  }
+  $('calDot').hidden = g.ok;
+
+  if (st.priceErr || !st.bars.length) {
+    $('verdict').textContent = '—'; $('verdictSub').innerHTML = `<span class="err">${st.priceErr || '未取得'}</span>`;
+    $('sideLong').innerHTML = ''; $('sideShort').innerHTML = ''; return;
+  }
+  st.ind = Core.indicators(st.bars);
+  st.live = st.bars[st.bars.length - 1].c;
+  const ev = Core.evaluate(st.bars, st.ind, st.live); st.ev = ev;
+  if (ev.error) { $('verdict').textContent = '—'; $('verdictSub').textContent = ev.error; return; }
+
+  const L = ev.long, S = ev.short;
+  const pick = [L, S].sort((a, b) => b.score - a.score)[0];
+  const names = { 1: 'ロング', '-1': 'ショート' };
+  let v, sub;
+  const best = [L, S].find(x => x.status === 'go') || [L, S].find(x => x.status === 'wait') || [L, S].find(x => x.status === 'watch');
+  if (best && best.status === 'go') { v = `🔥 ${names[best.dir]} エントリーチャンス`; sub = `トリガー ${best.trigger.toFixed(3)} を${best.dir === 1 ? '上抜け' : '下抜け'}。4要件すべて達成`; }
+  else if (best && best.status === 'wait') { v = `⏳ ${names[best.dir]} トリガー待ち`; sub = `逆指値 ${best.trigger.toFixed(3)} を置いて待つ（反発足の後2本以内）`; }
+  else if (best && best.status === 'watch') { v = `👀 ${names[best.dir]} 方向で監視`; sub = '環境はOK。20EMAまでの押し・戻りを待つ'; }
+  else { v = '💤 見送り'; sub = `ロング ${L.score}/4・ショート ${S.score}/4。方向感が足りない`; }
+  if (!g.ok && best && (best.status === 'go' || best.status === 'wait')) sub += '　※ただし今は禁止時間帯';
+  $('verdict').textContent = v; $('verdictSub').textContent = sub;
+
+  const side = (x, el) => {
+    const col = x.dir === 1 ? 'var(--long)' : 'var(--short)';
+    el.className = 'side ' + (x.dir === 1 ? 'long' : 'short') + (x === pick && x.score >= 3 ? ' hot' : '');
+    el.innerHTML = `<h3><span style="color:${col}">${x.dir === 1 ? 'ロング' : 'ショート'}</span><span class="score">${x.score}/4</span></h3>
+      <div class="bar"><i style="width:${x.score * 25}%;background:${col}"></i></div>` +
+      x.conds.map(c => `<div class="cond"><span class="mk">${c.ok ? '✅' : '⬜️'}</span><div>${c.name}<div class="d">${c.d}</div></div></div>`).join('');
+  };
+  side(L, $('sideLong')); side(S, $('sideShort'));
+
+  const i = ev.i, I = st.ind, f = x => x == null ? '—' : x.toFixed(3);
+  $('nums').innerHTML = [
+    ['現在値', f(st.live) + (st.bars[st.bars.length - 1].forming ? '（形成中の足）' : '')],
+    ['20EMA', f(I.e20[i])], ['80EMA', f(I.e80[i])], ['200EMA', f(I.e200[i])],
+    ['ATR(14)', (I.atr[i] / Core.PIP).toFixed(1) + ' pips'],
+    ['RSI(14)', I.rsi[i].toFixed(1) + '（参考・判定には不使用）'],
+    ['判定に使った足', Core.fmtHM(st.bars[i].t) + ' 確定足'],
+  ].map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('');
+  drawCanvas(ev);
+}
+
+function drawCanvas(ev) {
+  const cv = $('cv'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, Hh = 300;
+  cv.width = W * dpr; cv.height = Hh * dpr; const x = cv.getContext('2d'); x.scale(dpr, dpr);
+  const N = 64, b = st.bars.slice(-N), off = st.bars.length - b.length, I = st.ind;
+  const series = [['e20', '--e20'], ['e80', '--e80'], ['e200', '--e200']];
+  let lo = Infinity, hi = -Infinity;
+  b.forEach((k, j) => { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h);
+    series.forEach(([s]) => { const v = I[s][off + j]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }); });
+  const trg = [ev.long, ev.short].map(s => s.trigger).filter(v => v != null);
+  trg.forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
+  const padY = (hi - lo) * 0.06; lo -= padY; hi += padY;
+  const R = 52, cw = (W - R) / N, y = v => (hi - v) / (hi - lo) * (Hh - 16) + 8;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  x.fillStyle = '#12151b'; x.fillRect(0, 0, W, Hh);
+  x.strokeStyle = '#222733'; x.fillStyle = '#7f8796'; x.font = '10px -apple-system,sans-serif'; x.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) { const v = lo + (hi - lo) * g / 4, yy = y(v);
+    x.beginPath(); x.moveTo(0, yy); x.lineTo(W - R, yy); x.stroke(); x.fillText(v.toFixed(2), W - R + 4, yy + 3); }
+  b.forEach((k, j) => {
+    const cx = j * cw + cw / 2, up = k.c >= k.o;
+    x.strokeStyle = x.fillStyle = up ? css('--long') : css('--short');
+    x.globalAlpha = k.forming ? 0.5 : 1;
+    x.beginPath(); x.moveTo(cx, y(k.h)); x.lineTo(cx, y(k.l)); x.stroke();
+    const top = y(Math.max(k.o, k.c)), hgt = Math.max(1, Math.abs(y(k.o) - y(k.c)));
+    x.fillRect(cx - cw * 0.35, top, cw * 0.7, hgt);
+  });
+  x.globalAlpha = 1;
+  series.forEach(([s, c]) => { x.strokeStyle = css(c); x.lineWidth = 1.6; x.beginPath(); let st0 = false;
+    b.forEach((_, j) => { const v = I[s][off + j]; if (v == null) return; const px = j * cw + cw / 2;
+      st0 ? x.lineTo(px, y(v)) : x.moveTo(px, y(v)); st0 = true; }); x.stroke(); });
+  x.setLineDash([4, 4]); x.strokeStyle = 'rgba(255,255,255,.6)'; x.lineWidth = 1;
+  trg.forEach(v => { x.beginPath(); x.moveTo(0, y(v)); x.lineTo(W - R, y(v)); x.stroke(); });
+  x.setLineDash([]);
+  const last = st.bars[st.bars.length - 1].c; x.fillStyle = '#fff'; x.fillRect(W - R, y(last) - 7, R, 14);
+  x.fillStyle = '#000'; x.fillText(last.toFixed(3), W - R + 3, y(last) + 3);
+}
+
+function renderCal() {
+  const now = Date.now(), g = Core.gate(now, st.events);
+  const el = $('calGate');
+  if (!g.ok) { el.className = 'banner b-block'; el.innerHTML = '⛔ いまは新規エントリー禁止' + g.reasons.map(r => `<small>${r.label}</small>`).join(''); }
+  else { el.className = 'banner b-ok'; el.innerHTML = '✅ いまは禁止時間帯ではありません' + (g.next[0] ? `<small>次の禁止：${Core.fmtHM(g.next[0].from)}〜 ${g.next[0].ev.name}</small>` : ''); }
+
+  const today = Core.jstMidnight(now), prev = Core.prevBizDay(now);
+  const days = [[prev, '前営業日'], [today, '今日']];
+  let html = '';
+  for (const [d0, label] of days) {
+    const list = st.events.filter(e => e.t >= d0 && e.t < d0 + 24 * Core.H);
+    const gotobi = Core.isGotobi(d0 + 12 * Core.H);
+    html += `<div class="card"><h2>${label}　${Core.ymd(d0 + Core.H)}（${'日月火水木金土'[Core.dow(d0)]}）</h2>`;
+    const rows = [];
+    if (gotobi) rows.push({ t: d0 + 9.75 * Core.H, rank: 'X', name: '仲値（ごとうび）', win: [d0 + 9.75 * Core.H, d0 + 10 * Core.H] });
+    list.forEach(e => rows.push({ ...e, win: Core.windowOf(e) }));
+    rows.sort((a, b) => a.t - b.t);
+    const fetched = st.calAt > 0;
+    if (!fetched) html += `<div class="err">⚠️ 指標データ未取得。禁止時間帯を判定できないので、外部カレンダーで確認してください</div>`;
+    else if (!rows.length) html += `<div class="muted">${d0 < st.calWeekStart() ? '取得範囲外（今週分のみ取得）' : '対象の指標なし'}</div>`;
+    rows.forEach(r => {
+      const cls = r.win && now >= r.win[0] && now < r.win[1] ? 'now' : (r.t + (r.win ? r.win[1] - r.t : 0) < now ? 'past' : '');
+      const w = r.win ? `⛔ ${Core.fmtHM(r.win[0])}〜${Core.fmtHM(r.win[1])} 新規禁止` : '参考';
+      const fc = r.forecast || r.previous ? `　予想 ${r.forecast || '—'} / 前回 ${r.previous || '—'}` : '';
+      let res = '';
+      if (r.rank !== 'X' && r.t + 15 * Core.M < now) {
+        const jp = r.country === 'JPY';
+        const dl = d => d === 1 ? `<span class="buy">ドル買い${jp ? '（円売り）' : ''}</span>` : d === -1 ? `<span class="sell">ドル売り${jp ? '（円買い）' : ''}</span>` : '<span class="flat">方向感なし</span>';
+        const su = Core.surprise(r), rx = st.bars.length ? Core.reaction(st.bars, r.t) : null;
+        if (su) res += `<div class="res">結果 ${esc(r.actual)}（${su.label}）→ ${dl(su.dir)}材料</div>`;
+        if (rx) res += `<div class="res">発表後15分 ${rx.pips > 0 ? '+' : ''}${rx.pips.toFixed(1)}pips → ${rx.dir ? dl(rx.dir) : '<span class="flat">反応小（5pips未満）</span>'}</div>`;
+        if (!su && !rx) res += '<div class="res flat">結果・値動きは未取得</div>';
+      }
+      html += `<div class="ev ${cls}"><div class="t">${Core.fmtHM(r.t)}</div><div class="rk rk-${r.rank}">${r.rank === 'X' ? '仲値' : r.rank}</div>
+        <div>${r.name}<span class="flag">${r.country === 'USD' ? '🇺🇸' : r.country === 'JPY' ? '🇯🇵' : r.src === 'manual' ? '✍️' : ''}</span>
+        <div class="w">${w}${fc}</div>${res}</div></div>`;
+    });
+    html += '</div>';
+  }
+  $('calList').innerHTML = html;
+  $('calSrc').innerHTML = `出典：ForexFactory 週間カレンダー（米・日の重要度 高/中）｜状態：${st.calStatus}${st.calAt ? '（' + Core.fmtHM(st.calAt) + '）' : ''}<br>過去の指標は「結果の予想比（出典に実績値がある場合のみ）」と「発表後15分の実際の値動き」でドル買い/売りを表示。日本の祝日のごとうび判定は未対応。`;
+}
+st.calWeekStart = () => { const ts = st.events.filter(e => e.src === 'auto').map(e => e.t); return ts.length ? Core.jstMidnight(Math.min(...ts)) : 0; };
+
+function renderNews() {
+  const items = st.news.slice(0, 40);
+  const tag = n => { const s = n.h; const t = [];
+    if (/日銀|植田|日本銀行/.test(s)) t.push('日銀'); if (/FRB|FOMC|パウエル|米連邦/.test(s)) t.push('FRB');
+    if (/介入|財務官|財務相|レートチェック|けん制|牽制/.test(s)) t.push('介入・当局');
+    if (/ドル円|円相場|円安|円高|ドル・円/.test(s)) t.push('ドル円'); return t; };
+  $('newsList').innerHTML = items.length ? items.map(n => `<a class="news" href="${esc(n.u)}" target="_blank" rel="noopener">
+      <div class="h">${esc(n.h)}</div><div class="m">${tag(n).map(t => `<span class="tag">${t}</span>`).join('')}${Core.ymd(n.t).slice(5)} ${Core.fmtHM(n.t)}・${esc(n.s)}</div></a>`).join('')
+    : `<div class="muted">${st.newsStatus}</div>`;
+  $('newsSrc').textContent = '出典：Googleニュース（日本語、キーワード検索）｜' + st.newsStatus;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function renderAll() {
+  $('demoBanner').hidden = !cfg.demo;
+  $('hdrMeta').innerHTML = st.priceAt ? Core.fmtHM(st.priceAt) + ' 更新' : '未取得';
+  renderChart(); renderCal(); renderNews();
+}
+
+// ---------- 更新 ----------
+let busy = false;
+async function refresh(force) {
+  if (busy) return; busy = true; $('btnRefresh').textContent = '…';
+  await Promise.all([loadPrice(), loadCalendar(force), loadNews(force)]);
+  busy = false; $('btnRefresh').textContent = '↻'; renderAll();
+}
+// 価格の自動更新はしない（開いた時・アプリに戻った時・↻ボタンで更新）
+setInterval(() => { renderChart(); renderCal(); }, 30e3); // 禁止時間帯の表示を30秒ごとに更新
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - st.priceAt > 60e3) refresh(false); });
+window.addEventListener('resize', () => st.ev && !st.ev.error && drawCanvas(st.ev));
+
+// ---------- タブ ----------
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab));
+  if (b.dataset.tab === 'chart' && st.ev && !st.ev.error) drawCanvas(st.ev);
+});
+$('btnRefresh').onclick = () => refresh(true);
+
+// ---------- 設定 ----------
+function renderManual() {
+  $('mList').innerHTML = cfg.manual.map((m, k) => `<div class="cond"><span class="mk rk rk-${m.rank}">${m.rank}</span>
+    <div style="flex:1">${Core.ymd(m.t)} ${Core.fmtHM(m.t)} ${esc(m.name)}</div><button data-k="${k}" class="iconbtn">✕</button></div>`).join('') || '<div class="muted">なし</div>';
+  $('mList').querySelectorAll('button').forEach(b => b.onclick = () => { cfg.manual.splice(+b.dataset.k, 1); store.set('manual', cfg.manual); renderManual(); });
+}
+$('btnSettings').onclick = () => {
+  $('kTd').value = cfg.td; $('demo').checked = cfg.demo;
+  const u = store.get('usage', null);
+  $('usage').textContent = 'Twelve Data 本日の使用回数：' + (u && u.day === Core.ymd(Date.now()) ? u.n : 0) + ' / 800';
+  renderManual(); $('dlg').showModal();
+};
+$('mAdd').onclick = () => {
+  const v = $('mDt').value, n = $('mName').value.trim(); if (!v || !n) return;
+  cfg.manual.push({ t: Core.parseJst(v), name: n, rank: $('mRank').value });
+  cfg.manual.sort((a, b) => a.t - b.t); store.set('manual', cfg.manual); $('mName').value = ''; renderManual();
+};
+$('dlgClose').onclick = () => $('dlg').close();
+$('dlgSave').onclick = () => {
+  cfg.td = $('kTd').value.trim(); cfg.demo = $('demo').checked;
+  store.set('td', cfg.td); store.set('demo', cfg.demo);
+  $('dlg').close(); refresh(true);
+};
+
+refresh(false);
+</script>
+</body>
+</html>

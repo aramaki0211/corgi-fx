@@ -69,6 +69,14 @@
   .news:first-of-type{border-top:none}
   .news .h{font-weight:600}
   .news .m{font-size:12px;color:var(--sub);margin-top:2px}
+  .chips{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}
+  .chip{flex:none;font-size:13px;padding:6px 12px;border-radius:99px}
+  .chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .news.nbuy{border-left:3px solid var(--long);padding-left:10px}
+  .news.nsell{border-left:3px solid var(--short);padding-left:10px}
+  .tag.dbuy{background:rgba(34,193,163,.18);color:var(--long)}
+  .tag.dsell{background:rgba(239,83,80,.18);color:var(--short)}
+  .orig{color:var(--sub);font-size:12px;margin-left:6px;text-decoration:underline}
   .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:5px;background:var(--line);color:var(--sub);margin-right:4px}
   .err{color:#ffb27d;font-size:13px}
   .buy{color:var(--long);font-weight:700}.sell{color:var(--short);font-weight:700}.flat{color:var(--sub)}
@@ -122,7 +130,6 @@
       <canvas id="cv" height="300"></canvas>
       <div class="legend">
         <span><i style="background:var(--e20)"></i>20EMA</span>
-        <span><i style="background:var(--e80)"></i>80EMA</span>
         <span><i style="background:var(--e200)"></i>200EMA</span>
         <span><i style="background:#fff;opacity:.6"></i>トリガー</span>
       </div>
@@ -141,7 +148,7 @@
       <div class="muted">
         <b style="color:#b39ddb">S級</b> 前60分〜後30分 新規禁止（保有は発表前に手仕舞い）<br>
         <b style="color:var(--warn)">A級</b> 前30分〜後15分 新規禁止<br>
-        <b style="color:#a0aec0">仲値</b> 5・10日（ごとうび）9:45〜10:00 新規禁止<br>
+        <b style="color:#a0aec0">仲値</b> 5の倍数の日・月末（ごとうび、休日なら前営業日）9:45〜10:00 新規禁止<br>
         B は参考表示のみ。時刻はすべて日本時間。
       </div>
     </div>
@@ -152,17 +159,21 @@
   <!-- ===== ニュース ===== -->
   <section class="tab" id="tab-news">
     <div class="card">
-      <h2>リンク（タップでSafariで開く）</h2>
-      <a class="src" href="https://kissfx.com/" target="_blank" rel="noopener"><span>羊飼いのFXブログ　今日の注目材料・相場観</span><span>↗</span></a>
-      <a class="src" href="https://www.gaitame.com/markets/news/" target="_blank" rel="noopener"><span>外為どっとコム　外為情報ナビ ニュース</span><span>↗</span></a>
-      <a class="src" href="https://min-fx.jp/market/news/" target="_blank" rel="noopener"><span>みんなのFX　為替ニュース</span><span>↗</span></a>
-      <div class="muted" style="margin-top:6px">これらのサイトは配信用データ（RSS）がないため、アプリ内には取り込めません。</div>
+      <h2>過去24時間のまとめ</h2>
+      <div id="newsSum" class="muted">未取得</div>
     </div>
+    <div class="chips" id="newsChips"></div>
     <div class="card">
-      <h2>ドル円関連ニュース（過去24時間）</h2>
+      <h2>ドル円関連ニュース（見出し）</h2>
       <div id="newsList"><div class="muted">未取得</div></div>
     </div>
     <div class="muted" id="newsSrc"></div>
+    <div class="card" style="margin-top:12px">
+      <h2>外部サイト（Safariで開きます）</h2>
+      <a class="src" href="https://kissfx.com/" target="_blank" rel="noopener"><span>羊飼いのFXブログ　今日の注目材料・相場観</span><span>↗</span></a>
+      <a class="src" href="https://www.gaitame.com/markets/news/" target="_blank" rel="noopener"><span>外為どっとコム　外為情報ナビ ニュース</span><span>↗</span></a>
+      <a class="src" href="https://min-fx.jp/market/news/" target="_blank" rel="noopener"><span>みんなのFX　為替ニュース</span><span>↗</span></a>
+    </div>
   </section>
 </main>
 
@@ -251,7 +262,7 @@ const Core = (() => {
   }
   function indicators(bars) {
     const c = bars.map(b => b.c);
-    return { e20: ema(c, 20), e80: ema(c, 80), e200: ema(c, 200), atr: atr(bars, 14), rsi: rsi(c, 14) };
+    return { e20: ema(c, 20), e200: ema(c, 200), atr: atr(bars, 14), rsi: rsi(c, 14) };
   }
 
   // ---- エントリー4要件 ----
@@ -265,15 +276,15 @@ const Core = (() => {
   }
 
   function evalSide(dir, b, ind, i, live) {
-    const { e20, e80, e200, atr: A } = ind;
+    const { e20, e200, atr: A } = ind;
     const L = dir === 1;
     const f2 = x => x.toFixed(3);
 
     // ① 環境（判定は最新の確定足で行う）
     const env = k => {
       const order = L ? (b[k].c > e20[k] && e20[k] > e200[k]) : (b[k].c < e20[k] && e20[k] < e200[k]);
-      const s200 = (e200[k] - e200[k - 20]) * dir, s80 = (e80[k] - e80[k - 20]) * dir;
-      return { ok: order && s200 >= 0.3 * A[k] && s80 > 0, order, s200, s80 };
+      const s200 = (e200[k] - e200[k - 20]) * dir;
+      return { ok: order && s200 >= 0.3 * A[k], order, s200 };
     };
     // ② 押し・戻り（直近3本のどれかの安値/高値が 20EMA±0.5ATR）＋ 乖離2ATR以内
     const pull = k => {
@@ -305,7 +316,7 @@ const Core = (() => {
     const k0 = s ?? i;
     const e = env(i), p = pull(s ?? i);
     const c1 = { name: '① 環境', ok: e.ok,
-      d: `並び${e.order ? '○' : '×'} / 200EMA傾き ${(e.s200 / A[i]).toFixed(2)}ATR（0.3以上）/ 80EMA ${e.s80 > 0 ? (L ? '上向き' : '下向き') : '逆向き・横ばい'}` };
+      d: `並び${e.order ? '○' : '×'} / 200EMA傾き ${(e.s200 / A[i]).toFixed(2)}ATR（0.3以上）` };
     const c2 = { name: L ? '② 押し' : '② 戻り', ok: p.ok,
       d: `${L ? '安値' : '高値'}が20EMA±0.5ATR ${p.touched ? '到達' : '未到達'} / 乖離 ${(Math.abs(b[k0].c - e20[k0]) / A[k0]).toFixed(2)}ATR（2以下）` };
     const c3 = { name: '③ 反発足', ok: s !== null,
@@ -362,16 +373,48 @@ const Core = (() => {
     return { pips, dir: Math.abs(pips) < 5 ? 0 : (pips > 0 ? 1 : -1) };
   }
 
-  // ---- ごとうび（5・10日、月末。土日なら前の金曜。日本の祝日は未対応） ----
+  // ---- 日本の祝日・銀行休業日 ----
+  const hol = {};
+  function holidays(y) {
+    if (hol[y]) return hol[y];
+    const set = new Set(), key = (m, d) => m * 100 + d;
+    const nthMon = (m, n) => { const w = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); return 1 + ((8 - w) % 7) + 7 * (n - 1); };
+    const k = Math.floor((y - 1980) / 4);
+    [[1,1],[2,11],[2,23],[4,29],[5,3],[5,4],[5,5],[8,11],[11,3],[11,23],
+     [1,nthMon(1,2)],[7,nthMon(7,3)],[9,nthMon(9,3)],[10,nthMon(10,2)],
+     [3,Math.floor(20.8431 + 0.242194 * (y - 1980) - k)],[9,Math.floor(23.2488 + 0.242194 * (y - 1980) - k)]]
+      .forEach(([m, d]) => set.add(key(m, d)));
+    const dt = (m, d) => new Date(Date.UTC(y, m - 1, d));
+    // 国民の休日（祝日に挟まれた平日）
+    for (let m = 1; m <= 12; m++) for (let d = 2; d <= 30; d++) {
+      const a = new Date(Date.UTC(y, m - 1, d - 1)), b = new Date(Date.UTC(y, m - 1, d + 1));
+      if (set.has(key(a.getUTCMonth() + 1, a.getUTCDate())) && set.has(key(b.getUTCMonth() + 1, b.getUTCDate()))
+        && !set.has(key(m, d)) && dt(m, d).getUTCDay() !== 0) set.add(key(m, d));
+    }
+    // 振替休日（日曜の祝日 → 次の祝日でない日）
+    for (const v of [...set].sort((a, b) => a - b)) {
+      const m = Math.floor(v / 100), d = v % 100;
+      if (dt(m, d).getUTCDay() !== 0) continue;
+      let t = new Date(Date.UTC(y, m - 1, d + 1));
+      while (set.has(key(t.getUTCMonth() + 1, t.getUTCDate()))) t = new Date(t.getTime() + 24 * H);
+      set.add(key(t.getUTCMonth() + 1, t.getUTCDate()));
+    }
+    [[1,2],[1,3],[12,31]].forEach(([m, d]) => set.add(key(m, d))); // 銀行休業日
+    return hol[y] = set;
+  }
+  const isBankHoliday = ms => { const d = jst(ms); return holidays(d.getUTCFullYear()).has((d.getUTCMonth() + 1) * 100 + d.getUTCDate()); };
+  const isBizDay = ms => ![0, 6].includes(dow(ms)) && !isBankHoliday(ms);
+
+  // ---- ごとうび（5の倍数の日・月末。休日なら前の営業日にずらす） ----
   function isGotobi(ms) {
-    const d0 = jstMidnight(ms), w = dow(d0);
-    if (w === 0 || w === 6) return false;
+    const d0 = jstMidnight(ms);
+    if (!isBizDay(d0)) return false;
     const days = [d0];
-    if (w === 5) days.push(d0 + 24 * H, d0 + 48 * H);
+    for (let t = d0 + 24 * H; !isBizDay(t); t += 24 * H) days.push(t); // 翌営業日の前日まで
     return days.some(t => {
       const d = jst(t), day = d.getUTCDate();
       const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-      return (day % 5 === 0 && day <= 25) || day === last;
+      return day % 5 === 0 || day === last;
     });
   }
 
@@ -396,7 +439,7 @@ const Core = (() => {
   }
 
   return { PIP, H, M, jst, fmtHM, ymd, parseJst, jstMidnight, prevBizDay, dow, ema, atr, rsi, indicators,
-    evaluate, rankEvent, windowOf, isGotobi, gate, surprise, reaction };
+    evaluate, rankEvent, windowOf, isGotobi, isBankHoliday, gate, surprise, reaction };
 })();
 /*CORE_END*/
 
@@ -445,12 +488,27 @@ function demoBars() {
 async function loadCalendar(force) {
   const cache = store.get('cal', null);
   if (!force && cache && Date.now() - cache.at < 3 * Core.H) { applyCal(cache.raw, cache.at, '保存済みデータ'); return; }
-  try {
-    const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const raw = await r.json(); const at = Date.now();
-    store.set('cal', { raw, at }); applyCal(raw, at, '取得');
-  } catch (e) {
+  // ForexFactory はブラウザからの直接取得を拒否するため、中継サービス経由も順に試す
+  const FF = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+  const routes = [
+    ['直接', FF],
+    ['中継A', 'https://api.allorigins.win/raw?url=' + encodeURIComponent(FF)],
+    ['中継B', 'https://corsproxy.io/?url=' + encodeURIComponent(FF)],
+  ];
+  const errs = [];
+  for (const [name, url] of routes) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const raw = await r.json();
+      if (!Array.isArray(raw)) throw new Error('形式が違う');
+      const at = Date.now();
+      store.set('cal', { raw, at }); applyCal(raw, at, '取得（' + name + '）');
+      return;
+    } catch (e) { errs.push(name + ':' + e.message); }
+  }
+  {
+    const e = { message: errs.join(' / ') };
     if (cache) applyCal(cache.raw, cache.at, '取得失敗のため前回データ');
     else { st.events = manualEvents(); st.calStatus = '自動取得できませんでした（' + e.message + '）。手動追加分のみ表示中'; }
   }
@@ -543,7 +601,7 @@ function renderChart() {
   const i = ev.i, I = st.ind, f = x => x == null ? '—' : x.toFixed(3);
   $('nums').innerHTML = [
     ['現在値', f(st.live) + (st.bars[st.bars.length - 1].forming ? '（形成中の足）' : '')],
-    ['20EMA', f(I.e20[i])], ['80EMA', f(I.e80[i])], ['200EMA', f(I.e200[i])],
+    ['20EMA', f(I.e20[i])], ['200EMA', f(I.e200[i])],
     ['ATR(14)', (I.atr[i] / Core.PIP).toFixed(1) + ' pips'],
     ['RSI(14)', I.rsi[i].toFixed(1) + '（参考・判定には不使用）'],
     ['判定に使った足', Core.fmtHM(st.bars[i].t) + ' 確定足'],
@@ -555,7 +613,7 @@ function drawCanvas(ev) {
   const cv = $('cv'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, Hh = 300;
   cv.width = W * dpr; cv.height = Hh * dpr; const x = cv.getContext('2d'); x.scale(dpr, dpr);
   const N = 64, b = st.bars.slice(-N), off = st.bars.length - b.length, I = st.ind;
-  const series = [['e20', '--e20'], ['e80', '--e80'], ['e200', '--e200']];
+  const series = [['e20', '--e20'], ['e200', '--e200']];
   let lo = Infinity, hi = -Infinity;
   b.forEach((k, j) => { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h);
     series.forEach(([s]) => { const v = I[s][off + j]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }); });
@@ -627,19 +685,45 @@ function renderCal() {
     html += '</div>';
   }
   $('calList').innerHTML = html;
-  $('calSrc').innerHTML = `出典：ForexFactory 週間カレンダー（米・日の重要度 高/中）｜状態：${st.calStatus}${st.calAt ? '（' + Core.fmtHM(st.calAt) + '）' : ''}<br>過去の指標は「結果の予想比（出典に実績値がある場合のみ）」と「発表後15分の実際の値動き」でドル買い/売りを表示。日本の祝日のごとうび判定は未対応。`;
+  $('calSrc').innerHTML = `出典：ForexFactory 週間カレンダー（米・日の重要度 高/中）｜状態：${st.calStatus}${st.calAt ? '（' + Core.fmtHM(st.calAt) + '）' : ''}<br>過去の指標は「結果の予想比（出典に実績値がある場合のみ）」と「発表後15分の実際の値動き」でドル買い/売りを表示。ごとうびは日本の祝日・年末年始の銀行休業日も考慮。`;
 }
 st.calWeekStart = () => { const ts = st.events.filter(e => e.src === 'auto').map(e => e.t); return ts.length ? Core.jstMidnight(Math.min(...ts)) : 0; };
 
+// 見出しの言葉から「ドル円の方向」を判定（株価の「3007円安」などは除外）
+const NEWS_BUY = /(?<![0-9０-９,，])円安|円売り|ドル高|ドル買い|ドル[・/]?円.{0,6}(上昇|上伸|反発|高値)/;
+const NEWS_SELL = /(?<![0-9０-９,，])円高|円買い|ドル安|ドル売り|ドル[・/]?円.{0,6}(下落|軟化|反落|安値)/;
+// 当局の円安けん制・介入は円買い（ドル売り）材料として優先
+const NEWS_WARN = /円安.{0,4}(けん制|牽制|阻止|警戒|是正)|介入/;
+const NEWS_THEMES = [
+  ['日銀', /日銀|植田|日本銀行/], ['FRB', /FRB|FOMC|パウエル|米連邦/],
+  ['介入・当局', /介入|財務官|財務相|レートチェック|けん制|牽制/], ['指標', /雇用統計|CPI|物価|GDP|小売|ISM|PMI|失業/],
+];
+let newsTheme = 'すべて';
+function newsDir(h) { if (NEWS_WARN.test(h)) return -1; const b = NEWS_BUY.test(h), s = NEWS_SELL.test(h); return b && !s ? 1 : s && !b ? -1 : 0; }
 function renderNews() {
-  const items = st.news.slice(0, 40);
-  const tag = n => { const s = n.h; const t = [];
-    if (/日銀|植田|日本銀行/.test(s)) t.push('日銀'); if (/FRB|FOMC|パウエル|米連邦/.test(s)) t.push('FRB');
-    if (/介入|財務官|財務相|レートチェック|けん制|牽制/.test(s)) t.push('介入・当局');
-    if (/ドル円|円相場|円安|円高|ドル・円/.test(s)) t.push('ドル円'); return t; };
-  $('newsList').innerHTML = items.length ? items.map(n => `<a class="news" href="${esc(n.u)}" target="_blank" rel="noopener">
-      <div class="h">${esc(n.h)}</div><div class="m">${tag(n).map(t => `<span class="tag">${t}</span>`).join('')}${Core.ymd(n.t).slice(5)} ${Core.fmtHM(n.t)}・${esc(n.s)}</div></a>`).join('')
-    : `<div class="muted">${st.newsStatus}</div>`;
+  const all = st.news.slice(0, 60);
+  const themesOf = n => NEWS_THEMES.filter(([, re]) => re.test(n.h)).map(([k]) => k);
+  // まとめ
+  if (all.length) {
+    const buy = all.filter(n => newsDir(n.h) === 1).length, sell = all.filter(n => newsDir(n.h) === -1).length;
+    const tot = buy + sell, bp = tot ? Math.round(buy / tot * 100) : 50;
+    const th = NEWS_THEMES.map(([k]) => `${k} ${all.filter(n => themesOf(n).includes(k)).length}件`).join('・');
+    $('newsSum').innerHTML = `<div style="font-size:14px;color:var(--text)">見出し ${all.length}件のうち　<span class="buy">ドル買い材料 ${buy}件</span>　<span class="sell">ドル売り材料 ${sell}件</span></div>
+      <div class="bar" style="margin:8px 0;display:flex"><i style="width:${bp}%;background:var(--long)"></i><i style="width:${100 - bp}%;background:var(--short)"></i></div>
+      <div>テーマ：${th}</div><div style="margin-top:4px">※見出しの言葉（円安・円高など）から機械的に判定した目安です</div>`;
+  } else $('newsSum').textContent = st.newsStatus;
+  // テーマ切り替え
+  $('newsChips').innerHTML = ['すべて', ...NEWS_THEMES.map(([k]) => k)].map(k =>
+    `<button class="chip${k === newsTheme ? ' on' : ''}" data-k="${k}">${k}</button>`).join('');
+  $('newsChips').querySelectorAll('button').forEach(b => b.onclick = () => { newsTheme = b.dataset.k; renderNews(); });
+  // 一覧（タップしても外部に飛ばない。元記事は小さな↗から）
+  const items = all.filter(n => newsTheme === 'すべて' || themesOf(n).includes(newsTheme));
+  const dl = d => d === 1 ? '<span class="tag dbuy">ドル買い材料</span>' : d === -1 ? '<span class="tag dsell">ドル売り材料</span>' : '';
+  $('newsList').innerHTML = items.length ? items.map(n => `<div class="news ${newsDir(n.h) === 1 ? 'nbuy' : newsDir(n.h) === -1 ? 'nsell' : ''}">
+      <div class="h">${esc(n.h)}</div>
+      <div class="m">${dl(newsDir(n.h))}${themesOf(n).map(t => `<span class="tag">${t}</span>`).join('')}${Core.ymd(n.t).slice(5)} ${Core.fmtHM(n.t)}・${esc(n.s)}
+        <a class="orig" href="${esc(n.u)}" target="_blank" rel="noopener">元記事↗</a></div></div>`).join('')
+    : `<div class="muted">${all.length ? 'このテーマの見出しはありません' : st.newsStatus}</div>`;
   $('newsSrc').textContent = '出典：Googleニュース（日本語、キーワード検索）｜' + st.newsStatus;
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
